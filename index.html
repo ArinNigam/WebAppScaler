@@ -1,0 +1,226 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test</title>
+    <style>
+        body {
+            font-size: 18px; /* Increase the base font size */
+        }
+        h1 {
+            font-size: 2em; /* Increase the font size for headings */
+        }
+        input, button {
+            font-size: 1em; /* Increase the font size for inputs and buttons */
+        }
+        .center-container {
+            font-size: 1em; /* Ensure the container inherits the base font size */
+        }
+    </style>
+</head>
+<body>
+    <div class="center-container">
+        <h1>API Performance Test</h1>
+        <input type="number" id="reqCount1" placeholder="Enter number of requests">
+        <button id="apiButton1">GET</button>
+        <div id="results11"></div>
+        <div id="results12"></div>
+        
+        <h1>Using RabbitMQ</h1>
+        <input type="number" id="reqCount2" placeholder="Enter number of requests">
+        <button id="apiButton2">GET</button>
+        <div id="results13"></div>
+        <div id="results14"></div>
+        
+        <h1>Using Kafka</h1>
+        <input type="number" id="reqCount3" placeholder="Enter number of requests">
+        <button id="apiButton3">GET</button>
+        <div id="results15"></div>
+        <div id="results16"></div>
+        
+        <h1>MongoDB Performance Test</h1>
+        <input type="number" id="entryCount" placeholder="Enter number of entries">
+        <button id="populateButton">Populate MongoDB</button>
+        <br><br>
+        <input type="text" id="entryValue" placeholder="Enter entry value">
+        <button id="retrieveButton">Retrieve Entry</button>
+        <br><br>
+        <button id="clearButton">Clear Database</button>
+        <div id="results2"></div>
+        
+        <h1>Redis Performance Test</h1>
+        <input type="number" id="redisEntryCount" placeholder="Enter number of entries">
+        <button id="populateRedisButton">Populate Redis</button>
+        <br><br>
+        <input type="text" id="redisEntryValue" placeholder="Enter entry value">
+        <button id="retrieveRedisButton">Retrieve Entry</button>
+        <br><br>
+        <button id="clearRedisButton">Clear Database</button>
+        <div id="results4"></div>
+    </div>
+    <script>
+        document.getElementById('apiButton1').addEventListener('click', async () => {
+            const resultsDiv1 = document.getElementById('results11');
+            const resultsDiv2 = document.getElementById('results12');
+            const reqCount = document.getElementById('reqCount1').value;
+            if (!reqCount || reqCount <= 0) {
+                resultsDiv1.innerHTML = '<p>Please enter a valid number of requests.</p>';
+                return;
+            }
+           
+           
+            resultsDiv2.innerHTML = 'Testing...';
+            
+            // Test for Multiple GET requests
+            async function fetchInBatches(url, totalRequests, batchSize) {
+            for (let i = 0; i < totalRequests; i += batchSize) {
+                    const batch = Array.from({ length: Math.min(batchSize, totalRequests - i) }, () => fetch(url));
+                    await Promise.all(batch);
+                }
+            }
+            const startBulk = performance.now();
+            await fetchInBatches('/api/test', `${reqCount}`, 1); 
+            const endBulk = performance.now();
+            const bulkDuration = endBulk - startBulk;
+            if (bulkDuration > 1000){
+                resultsDiv2.innerHTML = `<p>${reqCount} GET requests took: ${(bulkDuration/1000).toFixed(2)} s</p>`;
+            }else{
+                resultsDiv2.innerHTML = `<p>${reqCount} GET requests took: ${bulkDuration.toFixed(2)} ms</p>`;
+            }
+        });
+        document.getElementById("apiButton2").addEventListener("click", async () => {
+            const resultsDiv3 = document.getElementById('results13');
+            const resultsDiv4 = document.getElementById('results14');
+            const reqCount = document.getElementById("reqCount2").value;
+            if (!reqCount || reqCount <= 0) {
+                resultsDiv2.innerHTML = '<p>Please enter a valid number of requests.</p>';
+                return;
+            }
+           
+            resultsDiv4.innerHTML = 'Testing...';
+            
+            // Test for Multiple GET requests
+            const start = performance.now();
+            for (let i = 0; i < reqCount; i++) {
+                const response = await fetch(`/api/test-mq?index=${i}`);
+            }
+            const end= performance.now();
+            const duration = end - start;
+             if (duration > 1000){
+                resultsDiv4.innerHTML =  `<p>${reqCount} GET requests took: ${(duration / 1000).toFixed(2)} s</p>`;
+            }else{
+                resultsDiv4.innerHTML = `<p>${reqCount} GET requests took: ${duration.toFixed(2)} ms</p>`;
+            }
+        });
+        document.getElementById('apiButton3').addEventListener('click', async () => {
+            const resultsDiv5 = document.getElementById('results15');
+            const resultsDiv6 = document.getElementById('results16');
+            const reqCount = document.getElementById('reqCount3').value;
+
+            if (!reqCount || reqCount <= 0) {
+                resultsDiv5.innerHTML = '<p>Please enter a valid number of requests.</p>';
+                return;
+            }
+
+            // Test single request (Kafka can handle it in bulk)
+            resultsDiv6.innerHTML = "Testing ..."
+            const start = performance.now();
+            await fetch('/api/test-kafka', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ reqCount: reqCount }),
+            });
+            const end = performance.now();
+            const singleDuration = end - start;
+
+            resultsDiv6.innerHTML = `<p>${reqCount} requests took: ${singleDuration.toFixed(2)} ms</p>`;
+        });
+        const resultsMongoDiv = document.getElementById('results2');
+        // Populate mongoDB
+        document.getElementById('populateButton').addEventListener('click', async () => {
+            const entryCount = document.getElementById('entryCount').value;
+            if (!entryCount || entryCount <= 0) {
+                resultsMongoDiv.innerHTML = '<p>Please enter a valid number of entries.</p>';
+                return;
+            }
+            resultsMongoDiv.innerHTML = 'Populating database...';
+            const response = await fetch('/api/populate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ entryCount: parseInt(entryCount) })
+            });
+            const result = await response.json();
+            resultsMongoDiv.innerHTML = `<p>${result.message}</p>`;
+        });
+
+        // Retrieve a specific entry from mongoDB
+        document.getElementById('retrieveButton').addEventListener('click', async () => {
+            const entryValue = document.getElementById('entryValue').value;
+            if (!entryValue || entryValue <0) {
+                resultsMongoDiv.innerHTML = '<p>Please enter an entry value.</p>';
+                return;
+            }
+            resultsMongoDiv.innerHTML = 'Retrieving entry...';
+            const start = performance.now();
+            const response = await fetch(`/api/retrieve/${entryValue}`);
+            const result = await response.json();
+            const end = performance.now();
+            const duration = end - start;
+            resultsMongoDiv.innerHTML = `<p>${result.message}</p><p>Retrieval took: ${duration.toFixed(2)} ms</p>`;
+        });
+        
+        // Clear mongoDB database
+        document.getElementById('clearButton').addEventListener('click', async () => {
+            resultsMongoDiv.innerHTML = 'Clearing database...';
+            const response = await fetch('/api/clear', { method: 'DELETE' });
+            
+            const result = await response.json();
+            resultsMongoDiv.innerHTML = `<p>${result.message}</p>`;
+        });
+        
+        const resultsRedisDiv = document.getElementById('results4');
+        
+        // Populate Redis
+        document.getElementById("populateRedisButton").addEventListener("click", async () => {
+            const entryCount = document.getElementById("redisEntryCount").value;
+            resultsRedisDiv.innerHTML = 'Populating database...';
+            const response = await fetch("/api/populate-redis", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ entryCount: parseInt(entryCount) })
+            });
+            const result = await response.json();
+            document.getElementById("results4").innerText = result.message;
+        });
+        
+        // Retrieve a specific entry from Redis
+        document.getElementById("retrieveRedisButton").addEventListener("click", async () => {
+            const key = document.getElementById("redisEntryValue").value;
+            const start = performance.now();
+            const response = await fetch(`/api/retrieve-redis/${key}`);
+            const result = await response.json();
+            const end = performance.now();
+            const duration = end - start;
+            resultsRedisDiv.innerHTML = `<p>${result.message}</p><p>Retrieval took: ${duration.toFixed(2)} ms</p>`;
+        });
+
+        // Clear Redis database
+        document.getElementById("clearRedisButton").addEventListener("click", async () => {
+            resultsRedisDiv.innerHTML = 'Clearing database...';
+            const response = await fetch("/api/clear-redis", {
+                method: "DELETE"
+            });
+            const result = await response.json();
+            resultsRedisDiv.innerHTML = `<p>${result.message}</p>`;
+        });
+    </script>
+</body>
+</html>
